@@ -31,5 +31,7 @@ public class ClientUI extends JFrame{
 		showArea = new JTextArea();
 		userList = new JList();
 	}
-
+	public static void main(String[] args) {
+		
+	}
 }
