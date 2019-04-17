@@ -1,5 +1,8 @@
  package client;
 
+import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
@@ -20,10 +23,17 @@ import javax.swing.ButtonGroup;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JList;
+import javax.swing.JPanel;
 import javax.swing.JRadioButton;
+import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.ListModel;
+import javax.swing.ListSelectionModel;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 
 public class ClientUI extends JFrame{
 	public JList userList;
@@ -78,49 +88,133 @@ public class ClientUI extends JFrame{
 		toServerButton = new JButton("Send to server");
 		toClientButton = new JButton("Send to Client");
 		serverIpField = new JTextField("127.0.0.1");
-		serverPortField = new JTextField("8868");
+		serverPortField = new JTextField("8848");
 		clientPortField = new JTextField(String.valueOf(cPort));
 		clientPortField.setEditable(false);
-		messageField = new JTextArea();
-		showArea = new JTextArea();
+		messageField = new JTextArea(10,20);
+		showArea = new JTextArea(25,30);
 		userList = new JList();
+		userModel = new DefaultListModel();
 		userMap = new HashMap<>();
+		clientPortField.setEditable(false);
+		userList.setPreferredSize(new Dimension(200,100));
+		userList.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
+		showArea.setLineWrap(true);
+		showArea.setWrapStyleWord(true);
+		showArea.setEditable(false);
+		showArea.setAutoscrolls(true);
+		try {
+			ServerSocket serverSocket = new ServerSocket(cPort);
+			ClientAccept cAccept = new ClientAccept(serverSocket);
+			Thread cThread = new Thread(cAccept);
+			cThread.start();
+		} catch (IOException e2) {
+			// TODO: handle exception
+			e2.printStackTrace();
+		}
+		try {
+			socket = new Socket(serverIpField.getText(), Integer.parseInt(serverPortField.getText()));
+			InteractServer itServer = new InteractServer(socket);
+			Thread sThread = new Thread(itServer);
+			sThread.start();
+		} catch (UnknownHostException e1) {
+			// TODO Auto-generated catch block
+			showArea.append("Connect to server failed. Host: "+serverIpField.getText()+" port: "+serverPortField.getText()+"\n");
+			e1.printStackTrace();
+		} catch (IOException e2) {
+			// TODO: handle exception
+			showArea.append("Connect to server failed. Host: "+serverIpField.getText()+" port: "+serverPortField.getText()+"\n");
+			e2.printStackTrace();
+		}
 		connectButton.addActionListener(new ActionListener() {
 			
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				// TODO Auto-generated method stub
-				try {
-					ServerSocket serverSocket = new ServerSocket(cPort);
-					ClientAccept cAccept = new ClientAccept(serverSocket);
-					Thread cThread = new Thread(cAccept);
-					cThread.start();
-				} catch (IOException e2) {
-					// TODO: handle exception
-					e2.printStackTrace();
+				
+			}
+		});
+		userList.addListSelectionListener(new ListSelectionListener() {
+			
+			@Override
+			public void valueChanged(ListSelectionEvent e) {
+				// TODO Auto-generated method stub
+				int[] indices = userList.getSelectedIndices();
+				ListModel listModel = userList.getModel();
+				pair = new String[2];
+				for(int index : indices) {
+					String string = (String) listModel.getElementAt(index);
+					pair = string.split(" ");
+					System.out.println("Selected: "+index+"["+pair[1]+":"+pair[0]+"]");
 				}
+			}
+		});
+		toServerButton.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				// TODO Auto-generated method stub
+				toServer = messageField.getText();
+				writer.println(toServer);
+				writer.flush();
+			}
+		});
+		toClientButton.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				// TODO Auto-generated method stub
+				toClient = messageField.getText();
+				String ip = pair[1];
+				int port = Integer.parseInt(pair[0]);
 				try {
-					socket = new Socket(serverIpField.getText(), Integer.parseInt(serverPortField.getText()));
-					InteractServer itServer = new InteractServer(socket);
-					Thread sThread = new Thread(itServer);
-					sThread.start();
-				} catch (UnknownHostException e1) {
-					// TODO Auto-generated catch block
-					showArea.append("Connect to server failed. Host: "+serverIpField.getText()+" port: "+serverPortField.getText()+"\n");
-					e1.printStackTrace();
+					Socket s = new Socket(ip, port);
+					PrintWriter printWriter = new PrintWriter(s.getOutputStream());
+					printWriter.println(toClient);
+					printWriter.flush();
 				} catch (IOException e2) {
 					// TODO: handle exception
-					showArea.append("Connect to server failed. Host: "+serverIpField.getText()+" port: "+serverPortField.getText()+"\n");
 					e2.printStackTrace();
 				}
 			}
 		});
-		
 		this.addWindowListener(new WindowAdapter() {
 			public void windowClosing(WindowEvent event) {
 				isClosed = false;
 			}
 		});
+		JPanel leftPanel = new JPanel();
+		JPanel upPanel = new JPanel();
+		JPanel centerPanel = new JPanel();
+		JPanel downPanel = new JPanel();
+		upPanel.setLayout(new GridLayout(4,2));
+		upPanel.add(new JLabel("Server IP: "));
+		upPanel.add(serverIpField);
+		upPanel.add(new JLabel("Server port: "));
+		upPanel.add(serverPortField);
+		upPanel.add(new JLabel("My port: "));
+		upPanel.add(clientPortField);
+//		upPanel.add(connectButton);
+		centerPanel.setLayout(new BorderLayout(0, 15));
+		centerPanel.add(messageField,BorderLayout.CENTER);
+		centerPanel.add(userList, BorderLayout.NORTH);
+		downPanel.add(toClientButton);
+		downPanel.add(toServerButton);
+		leftPanel.setLayout(new BorderLayout(0, 20));
+		leftPanel.add(upPanel, BorderLayout.NORTH);
+		leftPanel.add(centerPanel, BorderLayout.CENTER);
+		leftPanel.add(downPanel, BorderLayout.SOUTH);
+		final JScrollPane scrollPane = new JScrollPane();
+		scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+		scrollPane.setViewportView(showArea);
+		JPanel rightPanel = new JPanel(new BorderLayout());
+		rightPanel.add(scrollPane, BorderLayout.CENTER);
+		getContentPane().add(leftPanel, BorderLayout.WEST);
+		getContentPane().add(rightPanel, BorderLayout.CENTER);
+		pack();
+		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		setVisible(true);
+		setResizable(false);
 	}
 	//与服务器交互的线程
 	class InteractServer implements Runnable{
@@ -160,13 +254,13 @@ public class ClientUI extends JFrame{
 								string = reader.readLine();
 							}
 							for(Map.Entry<String, String> entry:userMap.entrySet()) {
-								userModel.addElement(entry.getKey()+" ["+entry.getValue()+"]");
+								userModel.addElement(entry.getKey()+" "+entry.getValue());
 							}
 							userList.setModel(userModel);
 							System.out.println(userMap.toString());
 							continue;
 						}
-						showArea.append(string+"\n");
+						showArea.append("Receive from server: "+string+"\n");
 						System.out.println("Receive from server: "+string);
 					} catch (Exception e) {
 						// TODO: handle exception
@@ -216,36 +310,33 @@ public class ClientUI extends JFrame{
 	}
 	//与其他客户端交互的线程
 	class InteractClient implements Runnable{
-		private Socket socket;
-		public InteractClient(Socket ss) {
-			// TODO Auto-generated constructor stub
-			this.socket = ss;
-		}
-
-		@Override
+		private Socket shsocket;
+		public InteractClient(Socket socket ) {
+			this.shsocket = socket;
+		} 
+        
 		public void run() {
-			// TODO Auto-generated method stub
 			try {
-				BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-				PrintWriter printWriter = new PrintWriter(socket.getOutputStream());
-				String info = "< "+socket.getInetAddress().toString()+": "+socket.getPort()+" >";
-				String string;
-				System.out.println("Recieve from: "+socket.getLocalPort());
-				writer.println("Recieve from: "+socket.getLocalPort());
+				InputStreamReader reader = new InputStreamReader(shsocket.getInputStream());// 输入流
+				BufferedReader buffer_reader = new BufferedReader(reader);
+				PrintWriter writer = new PrintWriter(shsocket.getOutputStream());
+				String client = "<" + shsocket.getInetAddress().toString() + ":" + shsocket.getPort() + ">";
+				String str;
+				System.out.println("From: "+shsocket.getLocalPort());	
+				writer.println("From: "+shsocket.getLocalPort());
 				writer.flush();
-				while(true) {
-					try {
-						string = bufferedReader.readLine();
-						showArea.append(info+": "+string+"\n");
-					} catch (Exception e) {
-						// TODO: handle exception
-						break;
-					}
+			    while (true) {
+					try{
+						str = buffer_reader.readLine();
+						showArea.append(client+": "+str+"\n");
+						}
+					catch(Exception e) {
+						 break;   
+						}
 				}
-				bufferedReader.close();
-				socket.close();
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
+				buffer_reader.close();
+				shsocket.close();	
+			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
